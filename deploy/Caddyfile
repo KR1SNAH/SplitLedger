@@ -1,0 +1,15 @@
+# Caddy gets and renews a Let's Encrypt certificate for SITE_ADDRESS automatically, and redirects
+# HTTP to HTTPS. Everything goes to the frontend's nginx, which serves the app and proxies /api/ to
+# the backend, so the browser only ever talks to one origin.
+{$SITE_ADDRESS} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	reverse_proxy frontend:80
+}

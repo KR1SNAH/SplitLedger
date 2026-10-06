@@ -1,0 +1,81 @@
+# Production stack for a single server (e.g. an Oracle Cloud Always Free VM). See deploy/DEPLOY.md.
+#
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Differences from docker-compose.yml (local development):
+# - Caddy terminates HTTPS (automatic Let's Encrypt certificates) and is the only service with public ports.
+# - Postgres and the backend have no published ports: they're reachable only on the internal Docker network.
+# - Secrets have no defaults: startup fails unless they're set in .env.
+# - Containers restart automatically, and container logs are size-capped.
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: splitledger
+      POSTGRES_USER: ${DB_USERNAME:-splitledger}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging: *logging
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/splitledger
+      DB_USERNAME: ${DB_USERNAME:-splitledger}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env (openssl rand -base64 48)}
+      # The site is served over HTTPS only, so the refresh cookie can be Secure.
+      COOKIE_SECURE: "true"
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?Set ADMIN_EMAIL in .env}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}
+    # The JVM sizes its heap to 75% of this (see backend/Dockerfile).
+    mem_limit: 1g
+    depends_on:
+      db:
+        condition: service_healthy
+    logging: *logging
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    logging: *logging
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:?Set SITE_ADDRESS in .env, e.g. splitledger.duckdns.org}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Certificates live here; keep this volume so they aren't re-issued on every restart.
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+    logging: *logging
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

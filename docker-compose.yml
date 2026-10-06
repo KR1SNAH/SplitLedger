@@ -1,0 +1,42 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: splitledger
+      POSTGRES_USER: ${DB_USERNAME:-splitledger}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-splitledger}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/splitledger
+      DB_USERNAME: ${DB_USERNAME:-splitledger}
+      DB_PASSWORD: ${DB_PASSWORD:-splitledger}
+      JWT_SECRET: ${JWT_SECRET:-L1dEBkcQ2IiqC1BW/lmtNl1/TBRCJxTw1dvM0WKWtVrVrwi+6xFKF6p/XGLM67Vg}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@splitledger.dev}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin12345}
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:

@@ -1,0 +1,43 @@
+spring:
+  application:
+    name: splitledger
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/splitledger}
+    username: ${DB_USERNAME:splitledger}
+    password: ${DB_PASSWORD:splitledger}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        # Lazy associations (e.g. the shares on a page of group expenses) load in batches, not one query per row.
+        default_batch_fetch_size: 50
+  mvc:
+    problemdetails:
+      enabled: true
+
+app:
+  auth:
+    # Base64-encoded HMAC key (>= 32 bytes). The default is for local development only;
+    # always override JWT_SECRET in any deployed environment.
+    jwt-secret: ${JWT_SECRET:L1dEBkcQ2IiqC1BW/lmtNl1/TBRCJxTw1dvM0WKWtVrVrwi+6xFKF6p/XGLM67Vg}
+    issuer: splitledger
+    access-token-ttl: 15m
+    refresh-token-ttl: 14d
+    cookie-secure: ${COOKIE_SECURE:false}
+  admin:
+    # Seeded on startup if no user with this email exists. Leave email blank to skip.
+    email: ${ADMIN_EMAIL:admin@splitledger.dev}
+    password: ${ADMIN_PASSWORD:admin12345}
+    display-name: Admin
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html

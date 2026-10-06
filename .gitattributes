@@ -1,0 +1,7 @@
+# Normalize text files; keep shell scripts LF everywhere. A Windows checkout with core.autocrlf=true
+# would otherwise give them CRLF endings, which breaks ./mvnw inside the Docker build and the deploy scripts.
+* text=auto
+*.sh text eol=lf
+mvnw text eol=lf
+Caddyfile text eol=lf
+*.cmd text eol=crlf
